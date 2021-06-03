@@ -5,6 +5,8 @@ is available for the best text editor.
 
 ![](screencast.gif)
 
+(It looks way better than in the gif, trust me.)
+
 ## Installation
 
 Currently, this package is not on M?ELPA. In the meantime, please clone and
