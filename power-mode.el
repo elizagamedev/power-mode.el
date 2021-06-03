@@ -1,5 +1,17 @@
-;;; power-mode.el --- -*- lexical-binding:t -*-
+;;; power-mode.el --- Imbue Emacs with power! -*- lexical-binding:t -*-
+
+;; Version: 0.1.0
+;; Author: Eliza Velasquez
+;; Created: 3 Jun 2021
+;; Keywords: power-mode
+;; URL: https://github.com/elizagamedev/power-mode.el
+
 ;;; Commentary:
+
+;; At long last, Power Mode is available for the best text editor.
+;;
+;; See README.md for more information.
+
 ;;; Code:
 
 (require 'cl-lib)
@@ -13,7 +25,9 @@
   20
   "Streak required before combo counter is displayed.
 
-Set to nil to disable combo counter."
+Set to nil to disable combo counter.
+
+(Not implemented yet.)"
   :type '(choice integer (const nil))
   :group 'power-mode)
 
@@ -46,13 +60,13 @@ Set to nil to disable particle effects."
   :group 'power-mode)
 
 (defcustom power-mode-particle-range
-  '(2 . 5)
+  '(1 . 3)
   "Range of particles to spawn for each character, inclusive."
   :type (cons 'integer 'integer)
   :group 'power-mode)
 
 (defcustom power-mode-particle-limit
-  50
+  20
   "Maximum number of particles that can be on-screen."
   :type 'integer
   :group 'power-mode)
@@ -106,6 +120,7 @@ Set to nil to disable particle effects."
         (cl-decf power-mode--shake-amplitude)))))
 
 (defun power-mode--make-shake-frame (frame)
+  "Make a shake frame and insert it into FRAME."
   (let ((frame-parameters (copy-alist (frame-parameters frame))))
     ;; Copy given frame parameters, overriding some of its options.
     (dolist (key '(parent-id
@@ -127,6 +142,13 @@ Set to nil to disable particle effects."
                          'power-mode--cursor-type
                          (frame-parameter frame 'cursor-type))
     (set-frame-parameter frame 'cursor-type nil)
+    ;; Replace old title. The top-level buffer is no longer meaningful and Emacs
+    ;; randomly switches between single and multi frame mode, causing the title
+    ;; to flicker.
+    (set-frame-parameter frame
+                         'power-mode--title
+                         (frame-parameter frame 'title))
+    (set-frame-parameter frame 'title "GNU Emacs POWER MODE")
     ;; Make and focus new frame.
     (let ((new-frame (make-frame frame-parameters)))
       (setq power-mode--shake-frames
@@ -134,6 +156,7 @@ Set to nil to disable particle effects."
       (select-frame-set-input-focus new-frame))))
 
 (defun power-mode--delete-shake-frame (parent-frame shake-frame)
+  "Remove SHAKE-FRAME from PARENT-FRAME and restore its previous state."
   (let ((buffer (with-selected-frame shake-frame
                   (current-buffer))))
     (delete-frame shake-frame)
@@ -146,7 +169,13 @@ Set to nil to disable particle effects."
      parent-frame
      'cursor-type
      (frame-parameter parent-frame 'power-mode--cursor-type))
-    (set-frame-parameter parent-frame 'power-mode--cursor-type nil)))
+    (set-frame-parameter parent-frame 'power-mode--cursor-type nil)
+    ;; Restore old title.
+    (set-frame-parameter
+     parent-frame
+     'title
+     (frame-parameter parent-frame 'power-mode--title))
+    (set-frame-parameter parent-frame 'power-mode--title nil)))
 
 ;;;; Particle Effect
 
@@ -155,12 +184,14 @@ Set to nil to disable particle effects."
 (defvar power-mode--particle-timer nil)
 
 (defun power-mode--point-frame-position ()
+  "Get the position of the point relative to the top-left corner of the frame."
   (let ((edges (frame-edges))
         (position (window-absolute-pixel-position)))
     `(,(+ (- (car position) (nth 0 edges)) (/ (frame-char-width) 2))
       . ,(+ (- (cdr position) (nth 1 edges)) (/ (frame-char-height) 2)))))
 
 (defun power-mode--foreground-color-before-point ()
+  "Get the foreground color of the character before the point."
   (let ((mode hl-line-mode)
         (global-mode global-hl-line-mode))
     (hl-line-mode -1)
@@ -174,6 +205,7 @@ Set to nil to disable particle effects."
         color))))
 
 (defun power-mode--spawn-particles-at-point ()
+  "Spawn particles at the point."
   (unless power-mode--particle-timer
     (setq power-mode--particle-timer
           (run-with-timer 0 0.05
@@ -205,6 +237,7 @@ Set to nil to disable particle effects."
         (set-frame-parameter frame 'visibility t)))))
 
 (defun power-mode--animate-particles ()
+  "Periodic function to be called in a timer to animate particles."
   (let ((live-particles nil))
     (dolist (frame power-mode--particle-live-frames)
       (let ((life (- (frame-parameter frame 'power-mode--life) 1)))
@@ -237,6 +270,7 @@ Set to nil to disable particle effects."
       (setq power-mode--particle-timer nil))))
 
 (defun power-mode--make-particle-frame ()
+  "Make an invisible particle frame."
   (let ((frame (make-frame `((name . "particle")
                              (width . 2)
                              (height . 1)
@@ -278,7 +312,7 @@ Set to nil to disable particle effects."
 ;;;; Hooks
 
 (defun power-mode--post-self-insert-hook ()
-  "Power-mode hook for post-self-insert."
+  "Power-mode hook for `post-self-insert-hook'."
   (unless (minibufferp (current-buffer))
     (cl-incf power-mode--streak)
     ;; Reset streak timeout.
@@ -302,12 +336,18 @@ Set to nil to disable particle effects."
       (power-mode--spawn-particles-at-point))))
 
 (defun power-mode--delete-frame-function (child-frame)
+  "Power-mode hook for `delete-frame-functions'.
+
+Accepts CHILD-FRAME."
   (when-let (parent-frame (car (rassq child-frame power-mode--shake-frames)))
     (setq power-mode--shake-frames (assq-delete-all
                                     parent-frame power-mode--shake-frames))
     (delete-frame parent-frame)))
 
 (defun power-mode--window-size-change-function (parent-frame)
+  "Power-mode hook for `window-size-change-functions'.
+
+Accepts PARENT-FRAME."
   (when (framep parent-frame)
     (when-let ((child-frame (cdr (assq parent-frame power-mode--shake-frames))))
       (set-frame-size child-frame
