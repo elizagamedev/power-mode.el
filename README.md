@@ -11,7 +11,7 @@ Currently, this package is not on M?ELPA. In the meantime, please clone and
 extend your load path. For example:
 
 ```elisp
-(use-package 'power-mode
+(use-package power-mode
   :load-path "site-lisp/power-mode.el"
   :init
   (add-hook 'after-init-hook #'power-mode))
