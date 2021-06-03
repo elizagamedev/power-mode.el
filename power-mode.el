@@ -154,7 +154,7 @@ Set to nil to disable particle effects."
 (defvar power-mode--particle-timer nil)
 
 (defun power-mode--point-frame-position ()
-  (let ((edges (window-absolute-body-pixel-edges))
+  (let ((edges (frame-edges))
         (position (window-absolute-pixel-position)))
     `(,(+ (- (car position) (nth 0 edges)) (/ (frame-char-width) 2))
       . ,(+ (- (cdr position) (nth 1 edges)) (/ (frame-char-height) 2)))))
@@ -180,10 +180,14 @@ Set to nil to disable particle effects."
                              (power-mode--random-range -5 5))
         (set-frame-parameter frame 'power-mode--vy
                              (power-mode--random-range -10 -6))
-        (set-frame-parameter frame 'left (- (car position)
-                                            (/ (frame-pixel-width frame) 2)))
-        (set-frame-parameter frame 'top (- (cdr position)
-                                           (/ (frame-pixel-height frame) 2)))
+        (let ((x (- (car position)
+                    (/ (frame-pixel-width frame) 2)))
+              (y (- (cdr position)
+                    (/ (frame-pixel-height frame) 2))))
+          (set-frame-parameter frame 'left x)
+          (set-frame-parameter frame 'top y)
+          (set-frame-parameter frame 'power-mode--x x)
+          (set-frame-parameter frame 'power-mode--y y))
         (set-frame-parameter frame 'visibility t)))))
 
 (defun power-mode--animate-particles ()
@@ -199,13 +203,20 @@ Set to nil to disable particle effects."
           (progn
             (setq live-particles (cons frame live-particles))
             (set-frame-parameter frame 'power-mode--life life)
-            (set-frame-parameter frame 'left
-                                 (+ (frame-parameter frame 'left)
-                                    (frame-parameter frame 'power-mode--vx)))
-            (let ((vy (frame-parameter frame 'power-mode--vy)))
-              (set-frame-parameter frame 'top
-                                   (+ (frame-parameter frame 'top) vy))
-              (set-frame-parameter frame 'power-mode--vy (+ vy 1)))))))
+            (let* ((vx (frame-parameter frame 'power-mode--vx))
+                   (vy (frame-parameter frame 'power-mode--vy))
+                   (x (+ vx (frame-parameter frame 'power-mode--x)))
+                   (y (+ vy (frame-parameter frame 'power-mode--y))))
+              (set-frame-parameter frame 'power-mode--x x)
+              (set-frame-parameter frame 'power-mode--y y)
+              (set-frame-parameter frame 'power-mode--vy (+ vy 1))
+              (if (or (< x 0) (>= x (frame-native-width))
+                      (< y 0) (>= y (frame-native-height)))
+                  (set-frame-parameter frame 'visibility nil)
+                (progn
+                  (set-frame-parameter frame 'left x)
+                  (set-frame-parameter frame 'top y)
+                  (set-frame-parameter frame 'visibility t))))))))
     (setq power-mode--particle-live-frames live-particles)
     (unless live-particles
       (cancel-timer power-mode--particle-timer)
@@ -234,6 +245,8 @@ Set to nil to disable particle effects."
                              (cursor-type . nil)
                              (visibility . nil)
                              (power-mode--life . 0)
+                             (power-mode--x . 0)
+                             (power-mode--y . 0)
                              (power-mode--vx . 0)
                              (power-mode--vy . 0)))))
     ;; Shrink font.
