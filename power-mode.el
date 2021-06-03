@@ -3,6 +3,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'hl-line)
 
 (defgroup power-mode nil
   "Imbue Emacs with power."
@@ -159,6 +160,19 @@ Set to nil to disable particle effects."
     `(,(+ (- (car position) (nth 0 edges)) (/ (frame-char-width) 2))
       . ,(+ (- (cdr position) (nth 1 edges)) (/ (frame-char-height) 2)))))
 
+(defun power-mode--foreground-color-before-point ()
+  (let ((mode hl-line-mode)
+        (global-mode global-hl-line-mode))
+    (hl-line-mode -1)
+    (global-hl-line-mode -1)
+    (save-excursion
+      (when (< 0 (current-column))
+        (backward-char))
+      (let ((color (foreground-color-at-point)))
+        (hl-line-mode mode)
+        (global-hl-line-mode global-mode)
+        color))))
+
 (defun power-mode--spawn-particles-at-point ()
   (unless power-mode--particle-timer
     (setq power-mode--particle-timer
@@ -167,7 +181,7 @@ Set to nil to disable particle effects."
   (let ((position (power-mode--point-frame-position))
         (count (power-mode--random-range (car power-mode-particle-range)
                                          (cdr power-mode-particle-range)))
-        (color "white")
+        (color (power-mode--foreground-color-before-point))
         (parent-frame (selected-frame)))
     (dotimes (_ count)
       (when-let ((frame (pop power-mode--particle-dead-frames)))
