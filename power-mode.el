@@ -44,13 +44,31 @@ Set to nil to disable particle effects."
   :type 'integer
   :group 'power-mode)
 
+(defcustom power-mode-particle-range
+  '(2 . 5)
+  "Range of particles to spawn for each character, inclusive."
+  :type (cons 'integer 'integer)
+  :group 'power-mode)
+
+(defcustom power-mode-particle-limit
+  50
+  "Maximum number of particles that can be on-screen."
+  :type 'integer
+  :group 'power-mode)
+
+;;;; Common
+
 (defvar power-mode--dummy-buffer nil)
 
-(defvar power-mode--shake-frames nil
-  "Alist of parent to child.")
-(defvar power-mode--shake-amplitude 0)
-(defvar power-mode--shake-frame nil)
-(defvar power-mode--shake-timer nil)
+(defun power-mode--random-float ()
+  "Return a random float from 0 to 1, exclusive."
+  (/ (random (- most-positive-fixnum 1)) (float most-positive-fixnum)))
+
+(defun power-mode--random-range (min max)
+  "Return a random number between MIN and MAX, inclusive."
+  (+ min (random (+ 1 (- max min)))))
+
+;;;; Streak
 
 (defvar power-mode--streak 0)
 (defvar power-mode--streak-timeout-timer nil)
@@ -60,8 +78,13 @@ Set to nil to disable particle effects."
   (setq power-mode--streak 0
         power-mode--streak-timeout-timer nil))
 
-(defun power-mode--random-angle ()
-  (/ (* 2 float-pi (random 1024)) 1024))
+;;;; Shake Effect
+
+(defvar power-mode--shake-frames nil
+  "Alist of parent to child.")
+(defvar power-mode--shake-amplitude 0)
+(defvar power-mode--shake-frame nil)
+(defvar power-mode--shake-timer nil)
 
 (defun power-mode--shake ()
   "Shake effect function to be called at an interval."
@@ -72,7 +95,7 @@ Set to nil to disable particle effects."
         (dolist (parameter '(left top))
           (set-frame-parameter power-mode--shake-frame parameter 0)))
     (progn
-      (let ((angle (power-mode--random-angle)))
+      (let ((angle (* (power-mode--random-float) 2.0 float-pi)))
         (set-frame-parameter
          power-mode--shake-frame 'left
          (truncate (* (cos angle) power-mode--shake-amplitude)))
@@ -80,25 +103,6 @@ Set to nil to disable particle effects."
          power-mode--shake-frame 'top
          (truncate (* (sin angle) power-mode--shake-amplitude)))
         (cl-decf power-mode--shake-amplitude)))))
-
-(defun power-mode--post-self-insert-hook ()
-  "Power-mode hook for post-self-insert."
-  (cl-incf power-mode--streak)
-  ;; Reset streak timeout.
-  (when power-mode--streak-timeout-timer
-    (cancel-timer power-mode--streak-timeout-timer))
-  (setq power-mode--streak-timeout-timer
-        (run-with-timer power-mode-streak-timeout nil
-                        #'power-mode--streak-timeout))
-  ;; Start shake effects if they aren't already.
-  (when (and power-mode-streak-shake-threshold
-             (>= power-mode--streak power-mode-streak-shake-threshold)
-             (rassq (selected-frame) power-mode--shake-frames))
-    (setq power-mode--shake-amplitude power-mode-shake-strength)
-    (unless power-mode--shake-timer
-      (setq power-mode--shake-frame (selected-frame)
-            power-mode--shake-timer (run-with-timer 0 0.05
-                                                    #'power-mode--shake)))))
 
 (defun power-mode--make-shake-frame (frame)
   (let ((frame-parameters (copy-alist (frame-parameters frame))))
@@ -143,14 +147,76 @@ Set to nil to disable particle effects."
      (frame-parameter parent-frame 'power-mode--cursor-type))
     (set-frame-parameter parent-frame 'power-mode--cursor-type nil)))
 
-(defun power-mode--make-particle-frame (parent-frame color x y)
-  (let ((frame (make-frame `((parent-frame . ,parent-frame)
+;;;; Particle Effect
+
+(defvar power-mode--particle-live-frames nil)
+(defvar power-mode--particle-dead-frames nil)
+(defvar power-mode--particle-timer nil)
+
+(defun power-mode--point-frame-position ()
+  (let ((edges (window-absolute-body-pixel-edges))
+        (position (window-absolute-pixel-position)))
+    `(,(+ (- (car position) (nth 0 edges)) (/ (frame-char-width) 2))
+      . ,(+ (- (cdr position) (nth 1 edges)) (/ (frame-char-height) 2)))))
+
+(defun power-mode--spawn-particles-at-point ()
+  (unless power-mode--particle-timer
+    (setq power-mode--particle-timer
+          (run-with-timer 0 0.05
+                          #'power-mode--animate-particles)))
+  (let ((position (power-mode--point-frame-position))
+        (count (power-mode--random-range (car power-mode-particle-range)
+                                         (cdr power-mode-particle-range)))
+        (color "white")
+        (parent-frame (selected-frame)))
+    (dotimes (_ count)
+      (when-let ((frame (pop power-mode--particle-dead-frames)))
+        (setq power-mode--particle-live-frames
+              (cons frame power-mode--particle-live-frames))
+        (set-frame-parameter frame 'parent-frame parent-frame)
+        (set-frame-parameter frame 'background-color color)
+        (set-frame-parameter frame 'power-mode--life 10)
+        (set-frame-parameter frame 'power-mode--vx
+                             (power-mode--random-range -5 5))
+        (set-frame-parameter frame 'power-mode--vy
+                             (power-mode--random-range -10 -6))
+        (set-frame-parameter frame 'left (- (car position)
+                                            (/ (frame-pixel-width frame) 2)))
+        (set-frame-parameter frame 'top (- (cdr position)
+                                           (/ (frame-pixel-height frame) 2)))
+        (set-frame-parameter frame 'visibility t)))))
+
+(defun power-mode--animate-particles ()
+  (let ((live-particles nil))
+    (dolist (frame power-mode--particle-live-frames)
+      (let ((life (- (frame-parameter frame 'power-mode--life) 1)))
+        (if (<= life 0)
+            (progn
+              (setq power-mode--particle-dead-frames
+                    (cons frame power-mode--particle-dead-frames))
+              (set-frame-parameter frame 'visibility nil)
+              (set-frame-parameter frame 'parent-frame nil))
+          (progn
+            (setq live-particles (cons frame live-particles))
+            (set-frame-parameter frame 'power-mode--life life)
+            (set-frame-parameter frame 'left
+                                 (+ (frame-parameter frame 'left)
+                                    (frame-parameter frame 'power-mode--vx)))
+            (let ((vy (frame-parameter frame 'power-mode--vy)))
+              (set-frame-parameter frame 'top
+                                   (+ (frame-parameter frame 'top) vy))
+              (set-frame-parameter frame 'power-mode--vy (+ vy 1)))))))
+    (setq power-mode--particle-live-frames live-particles)
+    (unless live-particles
+      (cancel-timer power-mode--particle-timer)
+      (setq power-mode--particle-timer nil))))
+
+(defun power-mode--make-particle-frame ()
+  (let ((frame (make-frame `((name . "particle")
                              (width . 2)
                              (height . 1)
                              (min-width . 0)
                              (min-height . 0)
-                             (left . ,x)
-                             (top . ,y)
                              (unsplittable . t)
                              (minibuffer . nil)
                              (border-width . 0)
@@ -166,18 +232,47 @@ Set to nil to disable particle effects."
                              (no-other-frame . t)
                              (no-focus-on-map . t)
                              (cursor-type . nil)
-                             (background-color . ,color)
-                             (visibility . nil)))))
+                             (visibility . nil)
+                             (power-mode--life . 0)
+                             (power-mode--vx . 0)
+                             (power-mode--vy . 0)))))
+    ;; Shrink font.
     (set-face-attribute 'default frame
                         :height (/ (face-attribute
                                     'default :height
-                                    parent-frame) 4))
+                                    frame) 4))
+    ;; Switch to dummy buffer.
     (with-selected-frame frame
       (switch-to-buffer power-mode--dummy-buffer)
       (set-window-dedicated-p
        (get-buffer-window (current-buffer) t) t))
-    (set-frame-parameter frame 'visibility t)
     frame))
+
+;;;; Hooks
+
+(defun power-mode--post-self-insert-hook ()
+  "Power-mode hook for post-self-insert."
+  (unless (minibufferp (current-buffer))
+    (cl-incf power-mode--streak)
+    ;; Reset streak timeout.
+    (when power-mode--streak-timeout-timer
+      (cancel-timer power-mode--streak-timeout-timer))
+    (setq power-mode--streak-timeout-timer
+          (run-with-timer power-mode-streak-timeout nil
+                          #'power-mode--streak-timeout))
+    ;; Start shake effect timer if needed.
+    (when (and power-mode-streak-shake-threshold
+               (>= power-mode--streak power-mode-streak-shake-threshold)
+               (rassq (selected-frame) power-mode--shake-frames))
+      (setq power-mode--shake-amplitude power-mode-shake-strength)
+      (unless power-mode--shake-timer
+        (setq power-mode--shake-frame (selected-frame)
+              power-mode--shake-timer (run-with-timer 0 0.05
+                                                      #'power-mode--shake))))
+    ;; Spawn particles.
+    (when (and power-mode-streak-particle-threshold
+               (>= power-mode--streak power-mode-streak-particle-threshold))
+      (power-mode--spawn-particles-at-point))))
 
 (defun power-mode--delete-frame-function (child-frame)
   (when-let (parent-frame (car (rassq child-frame power-mode--shake-frames)))
@@ -218,7 +313,13 @@ Set to nil to disable particle effects."
         (when power-mode-streak-shake-threshold
           (dolist (frame (frame-list))
             (unless (frame-parent frame)
-              (power-mode--make-shake-frame frame)))))
+              (power-mode--make-shake-frame frame))))
+        ;; Make particle frames.
+        (when power-mode-streak-particle-threshold
+          (dotimes (_ power-mode-particle-limit)
+            (setq power-mode--particle-dead-frames
+                  (cons (power-mode--make-particle-frame)
+                        power-mode--particle-dead-frames)))))
     (progn
       (remove-hook 'post-self-insert-hook
                    #'power-mode--post-self-insert-hook)
@@ -230,15 +331,25 @@ Set to nil to disable particle effects."
       (dolist (pair power-mode--shake-frames)
         (power-mode--delete-shake-frame (car pair) (cdr pair)))
       (setq power-mode--shake-frames nil)
+      ;; Delete particle frames.
+      (dolist (frame power-mode--particle-live-frames)
+        (delete-frame frame))
+      (setq power-mode--particle-live-frames nil)
+      (dolist (frame power-mode--particle-dead-frames)
+        (delete-frame frame))
+      (setq power-mode--particle-dead-frames nil)
       ;; Kill dummy buffer.
       (kill-buffer power-mode--dummy-buffer)
       (setq power-mode--dummy-buffer nil)
-      ;; Force pending timeouts to activate.
+      ;; Kill timers.
+      (when power-mode--streak-timeout-timer
+        (power-mode--streak-timeout))
       (when power-mode--shake-timer
         (cancel-timer power-mode--shake-timer)
         (setq power-mode--shake-timer nil))
-      (when power-mode--streak-timeout-timer
-        (power-mode--streak-timeout)))))
+      (when power-mode--particle-timer
+        (cancel-timer power-mode--particle-timer)
+        (setq power-mode--particle-timer nil)))))
 
 (provide 'power-mode)
 
