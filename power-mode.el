@@ -317,7 +317,7 @@ Set to nil to disable particle effects."
                   #'power-mode--window-size-change-function)
         ;; Create dummy buffer.
         (setq power-mode--dummy-buffer
-              (let ((buffer (get-buffer-create " *power-mode dummy*")))
+              (let ((buffer (get-buffer-create " *power-mode*")))
                 (with-current-buffer buffer
                   (setq-local mode-line-format nil
                               buffer-read-only t))
