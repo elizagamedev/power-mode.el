@@ -1,6 +1,6 @@
 ;;; power-mode.el --- Imbue Emacs with power! -*- lexical-binding:t -*-
 
-;; Version: 0.1.0
+;; Version: 0.1.1
 ;; Author: Eliza Velasquez
 ;; Created: 3 Jun 2021
 ;; Keywords: power-mode
@@ -27,7 +27,7 @@
 
 Set to nil to disable combo counter.
 
-(Not implemented yet.)"
+Not implemented yet."
   :type '(choice integer (const nil))
   :group 'power-mode)
 
@@ -62,7 +62,7 @@ Set to nil to disable particle effects."
 (defcustom power-mode-particle-range
   '(1 . 3)
   "Range of particles to spawn for each character, inclusive."
-  :type (cons 'integer 'integer)
+  :type '(cons integer integer)
   :group 'power-mode)
 
 (defcustom power-mode-particle-limit
@@ -100,6 +100,7 @@ Set to nil to disable particle effects."
 (defvar power-mode--shake-amplitude 0)
 (defvar power-mode--shake-frame nil)
 (defvar power-mode--shake-timer nil)
+(defvar power-mode--allow-focus-parent nil)
 
 (defun power-mode--shake ()
   "Shake effect function to be called at an interval."
@@ -123,14 +124,13 @@ Set to nil to disable particle effects."
   "Make a shake frame and insert it into FRAME."
   (let ((frame-parameters (copy-alist (frame-parameters frame))))
     ;; Copy given frame parameters, overriding some of its options.
-    (dolist (key '(parent-id
-                   window-id
-                   outer-window-id))
-      (setq frame-parameters (assq-delete-all key frame-parameters)))
-    (dolist (pair `((left . 0)
+    (dolist (pair `((parent-id . nil)
+                    (window-id . nil)
+                    (outer-window-id . nil)
+                    (left . 0)
                     (top . 0)
                     (parent-frame . ,frame)))
-      (setcdr (assq (car pair) frame-parameters) (cdr pair)))
+      (setf (alist-get (car pair) frame-parameters nil t) (cdr pair)))
     ;; Make old parent window point to dummy buffer.
     (with-selected-frame frame
       (delete-other-windows)
@@ -151,9 +151,8 @@ Set to nil to disable particle effects."
     (set-frame-parameter frame 'title "GNU Emacs POWER MODE")
     ;; Make and focus new frame.
     (let ((new-frame (make-frame frame-parameters)))
-      (setq power-mode--shake-frames
-            (cons `(,frame . ,new-frame) power-mode--shake-frames))
-      (select-frame-set-input-focus new-frame))))
+      (select-frame-set-input-focus new-frame)
+      (push `(,frame . ,new-frame) power-mode--shake-frames))))
 
 (defun power-mode--delete-shake-frame (parent-frame shake-frame)
   "Remove SHAKE-FRAME from PARENT-FRAME and restore its previous state."
@@ -217,8 +216,7 @@ Set to nil to disable particle effects."
         (parent-frame (selected-frame)))
     (dotimes (_ count)
       (when-let ((frame (pop power-mode--particle-dead-frames)))
-        (setq power-mode--particle-live-frames
-              (cons frame power-mode--particle-live-frames))
+        (push frame power-mode--particle-live-frames)
         (set-frame-parameter frame 'parent-frame parent-frame)
         (set-frame-parameter frame 'background-color color)
         (set-frame-parameter frame 'power-mode--life 10)
@@ -243,27 +241,25 @@ Set to nil to disable particle effects."
       (let ((life (- (frame-parameter frame 'power-mode--life) 1)))
         (if (<= life 0)
             (progn
-              (setq power-mode--particle-dead-frames
-                    (cons frame power-mode--particle-dead-frames))
+              (push frame power-mode--particle-dead-frames)
               (set-frame-parameter frame 'visibility nil)
               (set-frame-parameter frame 'parent-frame nil))
-          (progn
-            (setq live-particles (cons frame live-particles))
-            (set-frame-parameter frame 'power-mode--life life)
-            (let* ((vx (frame-parameter frame 'power-mode--vx))
-                   (vy (frame-parameter frame 'power-mode--vy))
-                   (x (+ vx (frame-parameter frame 'power-mode--x)))
-                   (y (+ vy (frame-parameter frame 'power-mode--y))))
-              (set-frame-parameter frame 'power-mode--x x)
-              (set-frame-parameter frame 'power-mode--y y)
-              (set-frame-parameter frame 'power-mode--vy (+ vy 1))
-              (if (or (< x 0) (>= x (frame-native-width))
-                      (< y 0) (>= y (frame-native-height)))
-                  (set-frame-parameter frame 'visibility nil)
-                (progn
-                  (set-frame-parameter frame 'left x)
-                  (set-frame-parameter frame 'top y)
-                  (set-frame-parameter frame 'visibility t))))))))
+          (push frame live-particles)
+          (set-frame-parameter frame 'power-mode--life life)
+          (let* ((vx (frame-parameter frame 'power-mode--vx))
+                 (vy (frame-parameter frame 'power-mode--vy))
+                 (x (+ vx (frame-parameter frame 'power-mode--x)))
+                 (y (+ vy (frame-parameter frame 'power-mode--y))))
+            (set-frame-parameter frame 'power-mode--x x)
+            (set-frame-parameter frame 'power-mode--y y)
+            (set-frame-parameter frame 'power-mode--vy (+ vy 1))
+            (if (or (< x 0) (>= x (frame-native-width))
+                    (< y 0) (>= y (frame-native-height)))
+                (set-frame-parameter frame 'visibility nil)
+              (progn
+                (set-frame-parameter frame 'left x)
+                (set-frame-parameter frame 'top y)
+                (set-frame-parameter frame 'visibility t)))))))
     (setq power-mode--particle-live-frames live-particles)
     (unless live-particles
       (cancel-timer power-mode--particle-timer)
@@ -354,6 +350,15 @@ Accepts PARENT-FRAME."
                       (frame-width parent-frame)
                       (frame-height parent-frame)))))
 
+(defun power-mode--window-selection-change-function (parent-frame)
+  "Power-mode hook for `window-selection-change-functions'.
+
+Accepts PARENT-FRAME."
+  (when (and (not power-mode--allow-focus-parent)
+             (framep parent-frame))
+    (when-let ((child-frame (cdr (assq parent-frame power-mode--shake-frames))))
+      (select-frame-set-input-focus child-frame))))
+
 ;;;###autoload
 (define-minor-mode power-mode
   "Imbue Emacs with power."
@@ -369,6 +374,8 @@ Accepts PARENT-FRAME."
                   #'power-mode--delete-frame-function)
         (add-hook 'window-size-change-functions
                   #'power-mode--window-size-change-function)
+        (add-hook 'window-selection-change-functions
+                  #'power-mode--window-selection-change-function)
         ;; Create dummy buffer.
         (setq power-mode--dummy-buffer
               (let ((buffer (get-buffer-create " *power-mode*")))
@@ -394,6 +401,8 @@ Accepts PARENT-FRAME."
                    #'power-mode--delete-frame-function)
       (remove-hook 'window-size-change-functions
                    #'power-mode--window-size-change-function)
+      (remove-hook 'window-selection-change-functions
+                   #'power-mode--window-selection-change-function)
       ;; Delete shake frames.
       (dolist (pair power-mode--shake-frames)
         (power-mode--delete-shake-frame (car pair) (cdr pair)))
