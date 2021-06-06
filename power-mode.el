@@ -1,6 +1,5 @@
 ;;; power-mode.el --- Imbue Emacs with power! -*- lexical-binding:t -*-
 
-;; Version: 0.1.1
 ;; Author: Eliza Velasquez
 ;; Created: 3 Jun 2021
 ;; Keywords: power-mode
@@ -140,16 +139,15 @@ Set to nil to disable particle effects."
       (progn
         (cancel-timer power-mode--shake-timer)
         (setq power-mode--shake-timer nil)
-        (dolist (parameter '(left top))
-          (set-frame-parameter power-mode--shake-frame parameter 0)))
+        (modify-frame-parameters
+         power-mode--shake-frame `((left . 0)
+                                   (top . 0))))
     (progn
       (let ((angle (* (power-mode--random-float) 2.0 float-pi)))
-        (set-frame-parameter
-         power-mode--shake-frame 'left
-         (truncate (* (cos angle) power-mode--shake-amplitude)))
-        (set-frame-parameter
-         power-mode--shake-frame 'top
-         (truncate (* (sin angle) power-mode--shake-amplitude)))
+        (modify-frame-parameters
+         power-mode--shake-frame
+         `((left . ,(truncate (* (cos angle) power-mode--shake-amplitude)))
+           (top . ,(truncate (* (sin angle) power-mode--shake-amplitude)))))
         (cl-decf power-mode--shake-amplitude)))))
 
 (defun power-mode--make-shake-frame (frame)
@@ -238,22 +236,22 @@ Set to nil to disable particle effects."
     (dotimes (_ count)
       (when-let ((frame (pop power-mode--particle-dead-frames)))
         (push frame power-mode--particle-live-frames)
-        (set-frame-parameter frame 'parent-frame parent-frame)
-        (set-frame-parameter frame 'background-color color)
-        (set-frame-parameter frame 'power-mode--life 10)
-        (set-frame-parameter frame 'power-mode--vx
-                             (power-mode--random-range -5 5))
-        (set-frame-parameter frame 'power-mode--vy
-                             (power-mode--random-range -10 -6))
         (let ((x (- (car position)
                     (/ (frame-pixel-width frame) 2)))
               (y (- (cdr position)
                     (/ (frame-pixel-height frame) 2))))
-          (set-frame-parameter frame 'left x)
-          (set-frame-parameter frame 'top y)
-          (set-frame-parameter frame 'power-mode--x x)
-          (set-frame-parameter frame 'power-mode--y y))
-        (set-frame-parameter frame 'visibility t)))))
+          (modify-frame-parameters
+           frame
+           `((parent-frame . ,parent-frame)
+             (background-color . ,color)
+             (power-mode--life . 10)
+             (power-mode--vx . ,(power-mode--random-range -5 5))
+             (power-mode--vy . ,(power-mode--random-range -10 -6))
+             (power-mode--x . ,x)
+             (power-mode--y . ,y)
+             (left . ,x)
+             (top . ,y)
+             (visibility . t))))))))
 
 (defun power-mode--animate-particles ()
   "Periodic function to be called in a timer to animate particles."
@@ -263,32 +261,31 @@ Set to nil to disable particle effects."
         (if (<= life 0)
             (progn
               (push frame power-mode--particle-dead-frames)
-              (set-frame-parameter frame 'visibility nil)
-              (set-frame-parameter frame 'parent-frame nil))
+              (set-frame-parameter frame 'visibility nil))
           (push frame live-particles)
-          (set-frame-parameter frame 'power-mode--life life)
           (let* ((vx (frame-parameter frame 'power-mode--vx))
                  (vy (frame-parameter frame 'power-mode--vy))
                  (x (+ vx (frame-parameter frame 'power-mode--x)))
                  (y (+ vy (frame-parameter frame 'power-mode--y))))
-            (set-frame-parameter frame 'power-mode--x x)
-            (set-frame-parameter frame 'power-mode--y y)
-            (set-frame-parameter frame 'power-mode--vy (+ vy 1))
-            (if (or (< x 0) (>= x (frame-native-width))
-                    (< y 0) (>= y (frame-native-height)))
-                (set-frame-parameter frame 'visibility nil)
-              (progn
-                (set-frame-parameter frame 'left x)
-                (set-frame-parameter frame 'top y)
-                (set-frame-parameter frame 'visibility t)))))))
+            (modify-frame-parameters
+             frame
+             `((power-mode--life . ,life)
+               (power-mode--vy . ,(+ vy 1))
+               (power-mode--x . ,x)
+               (power-mode--y . ,y)
+               (left . ,x)
+               (top . ,y)
+               (visibility . ,(and (>= x 0) (< x (frame-native-width))
+                                   (>= y 0) (< y (frame-native-height))))))))))
     (setq power-mode--particle-live-frames live-particles)
     (unless live-particles
       (cancel-timer power-mode--particle-timer)
       (setq power-mode--particle-timer nil))))
 
-(defun power-mode--make-particle-frame ()
-  "Make an invisible particle frame."
+(defun power-mode--make-particle-frame (parent-frame)
+  "Make an invisible particle attached to PARENT-FRAME."
   (let ((frame (make-frame `((name . "particle")
+                             (parent-frame . ,parent-frame)
                              (width . 2)
                              (height . 1)
                              (border-width . 0)
@@ -409,7 +406,7 @@ Accepts PARENT-FRAME."
         (when power-mode-streak-particle-threshold
           (dotimes (_ power-mode-particle-limit)
             (setq power-mode--particle-dead-frames
-                  (cons (power-mode--make-particle-frame)
+                  (cons (power-mode--make-particle-frame (selected-frame))
                         power-mode--particle-dead-frames)))))
     (progn
       (remove-hook 'post-self-insert-hook
