@@ -102,6 +102,19 @@ Set to nil to disable particle effects."
 (defvar power-mode--shake-timer nil)
 (defvar power-mode--allow-focus-parent nil)
 
+(defconst power-mode--parent-parameters
+  '((cursor-type . nil)
+    ;; Replace old title. The top-level buffer is no longer meaningful and Emacs
+    ;; randomly switches between single and multi frame mode, causing the title
+    ;; to flicker.
+    (title . "GNU Emacs POWER MODE")
+    (no-other-window . t)))
+
+(defun power-mode--make-save-key (key)
+  "Make key based on KEY for saving and restoring parent frame parameters."
+  (intern (concat "power-mode--"
+                  (symbol-name key))))
+
 (defun power-mode--shake ()
   "Shake effect function to be called at an interval."
   (if (<= power-mode--shake-amplitude 0)
@@ -137,18 +150,12 @@ Set to nil to disable particle effects."
       (switch-to-buffer power-mode--dummy-buffer)
       (set-window-dedicated-p
        (get-buffer-window (current-buffer) t) t))
-    ;; Hide old parent cursor.
-    (set-frame-parameter frame
-                         'power-mode--cursor-type
-                         (frame-parameter frame 'cursor-type))
-    (set-frame-parameter frame 'cursor-type nil)
-    ;; Replace old title. The top-level buffer is no longer meaningful and Emacs
-    ;; randomly switches between single and multi frame mode, causing the title
-    ;; to flicker.
-    (set-frame-parameter frame
-                         'power-mode--title
-                         (frame-parameter frame 'title))
-    (set-frame-parameter frame 'title "GNU Emacs POWER MODE")
+    ;; Override parent parameters.
+    (dolist (pair power-mode--parent-parameters)
+      (set-frame-parameter frame
+                           (power-mode--make-save-key (car pair))
+                           (frame-parameter frame (car pair)))
+      (set-frame-parameter frame (car pair) (cdr pair)))
     ;; Make and focus new frame.
     (let ((new-frame (make-frame frame-parameters)))
       (select-frame-set-input-focus new-frame)
@@ -156,25 +163,20 @@ Set to nil to disable particle effects."
 
 (defun power-mode--delete-shake-frame (parent-frame shake-frame)
   "Remove SHAKE-FRAME from PARENT-FRAME and restore its previous state."
-  (let ((buffer (with-selected-frame shake-frame
+  (let ((power-mode--allow-focus-parent t)
+        (buffer (with-selected-frame shake-frame
                   (current-buffer))))
     (delete-frame shake-frame)
     (with-selected-frame parent-frame
       (set-window-dedicated-p
        (get-buffer-window (current-buffer) t) nil)
       (switch-to-buffer buffer))
-    ;; Restore old cursor.
-    (set-frame-parameter
-     parent-frame
-     'cursor-type
-     (frame-parameter parent-frame 'power-mode--cursor-type))
-    (set-frame-parameter parent-frame 'power-mode--cursor-type nil)
-    ;; Restore old title.
-    (set-frame-parameter
-     parent-frame
-     'title
-     (frame-parameter parent-frame 'power-mode--title))
-    (set-frame-parameter parent-frame 'power-mode--title nil)))
+    ;; Restore old parameters.
+    (dolist (pair power-mode--parent-parameters)
+      (let ((save-key (power-mode--make-save-key (car pair))))
+        (set-frame-parameter parent-frame (car pair)
+                             (frame-parameter parent-frame save-key))
+        (set-frame-parameter parent-frame save-key nil)))))
 
 ;;;; Particle Effect
 
@@ -270,29 +272,30 @@ Set to nil to disable particle effects."
   (let ((frame (make-frame `((name . "particle")
                              (width . 2)
                              (height . 1)
-                             (min-width . 0)
-                             (min-height . 0)
-                             (unsplittable . t)
-                             (minibuffer . nil)
                              (border-width . 0)
-                             (internal-border-width . 0)
-                             (vertical-scroll-bars . nil)
-                             (horizontal-scroll-bars . nil)
-                             (left-fringe . 0)
-                             (right-fringe . 0)
-                             (menu-bar-lines . 0)
-                             (tool-bar-lines . 0)
-                             (line-spacing . 0)
-                             (no-accept-focus . t)
-                             (no-other-frame . t)
-                             (no-focus-on-map . t)
+                             (child-frame-border-width . 0)
                              (cursor-type . nil)
-                             (visibility . nil)
+                             (desktop-dont-save . t)
+                             (horizontal-scroll-bars . nil)
+                             (internal-border-width . 0)
+                             (left-fringe . 0)
+                             (line-spacing . 0)
+                             (menu-bar-lines . 0)
+                             (min-height . 1)
+                             (min-width . 1)
+                             (minibuffer . nil)
+                             (no-accept-focus . t)
+                             (no-focus-on-map . t)
+                             (no-other-frame . t)
+                             (no-special-glyphs . t)
                              (power-mode--life . 0)
-                             (power-mode--x . 0)
-                             (power-mode--y . 0)
-                             (power-mode--vx . 0)
-                             (power-mode--vy . 0)))))
+                             (right-fringe . 0)
+                             (tab-bar-lines . 0)
+                             (tool-bar-lines . 0)
+                             (undecorated . t)
+                             (unsplittable . t)
+                             (vertical-scroll-bars . nil)
+                             (visibility . nil)))))
     ;; Shrink font.
     (set-face-attribute 'default frame
                         :height (/ (face-attribute
