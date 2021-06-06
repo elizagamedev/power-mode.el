@@ -83,6 +83,25 @@ Set to nil to disable particle effects."
   "Return a random number between MIN and MAX, inclusive."
   (+ min (random (+ 1 (- max min)))))
 
+(defun power-mode--make-dummy-buffer ()
+  "Make dummy buffer with no chrome."
+  (let ((buffer (get-buffer-create " *power-mode*")))
+    (with-current-buffer buffer
+      (setq-local mode-line-format nil
+                  header-line-format nil
+                  frame-title-format ""
+                  truncate-lines t
+                  cursor-type nil
+                  cursor-in-non-selected-windows nil
+                  show-trailing-whitespace nil
+                  display-line-numbers nil
+                  left-fringe-width nil
+                  right-fringe-width nil
+                  left-margin-width nil
+                  right-margin-width nil
+                  fringes-outside-margins 0))
+    buffer))
+
 ;;;; Streak
 
 (defvar power-mode--streak 0)
@@ -380,12 +399,7 @@ Accepts PARENT-FRAME."
         (add-hook 'window-selection-change-functions
                   #'power-mode--window-selection-change-function)
         ;; Create dummy buffer.
-        (setq power-mode--dummy-buffer
-              (let ((buffer (get-buffer-create " *power-mode*")))
-                (with-current-buffer buffer
-                  (setq-local mode-line-format nil
-                              buffer-read-only t))
-                buffer))
+        (setq power-mode--dummy-buffer (power-mode--make-dummy-buffer))
         ;; Make shake frames for all top-level frames.
         (when power-mode-streak-shake-threshold
           (dolist (frame (frame-list))
