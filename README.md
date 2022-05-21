@@ -19,6 +19,10 @@ extend your load path. For example:
   (add-hook 'after-init-hook #'power-mode))
 ```
 
+## Caveats
+
+- Don't use this on EXWM or you'll regret it.
+
 ## Wow! How does it work?
 
 [Giving me access to child frames was a
