@@ -290,7 +290,8 @@ Set to nil to disable particle effects."
 
 (defun power-mode--make-particle-frame (parent-frame)
   "Make an invisible particle attached to PARENT-FRAME."
-  (let ((frame (make-frame `((name . "particle")
+  (let ((frame-inhibit-implied-resize nil)
+	(frame (make-frame `((name . "particle")
                              (parent-frame . ,parent-frame)
                              (width . 2)
                              (height . 1)
