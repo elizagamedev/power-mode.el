@@ -324,7 +324,7 @@ Set to nil to disable particle effects."
     (set-face-attribute 'default frame
                         :height (/ (face-attribute
 				    'default :height
-				    frame) (power-mode--random-range 4 7)))
+				    frame) (power-mode--random-range 3 6)))
 
     ;; Switch to dummy buffer.
     (with-selected-frame frame
