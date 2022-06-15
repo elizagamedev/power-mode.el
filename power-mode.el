@@ -70,6 +70,12 @@ Set to nil to disable particle effects."
   :type 'integer
   :group 'power-mode)
 
+(defcustom power-mode-particle-life-expectancy
+  10
+  "the time a particle lives before it has to go"
+  :type 'integer
+  :group 'power-mode)
+
 ;;;; Common
 
 (defvar power-mode--dummy-buffer nil)
@@ -244,7 +250,7 @@ Set to nil to disable particle effects."
            frame
            `((parent-frame . ,parent-frame)
              (background-color . ,color)
-             (power-mode--life . 10)
+             (power-mode--life . ,power-mode-particle-life-expectancy)
              (power-mode--vx . ,(power-mode--random-range -5 5))
              (power-mode--vy . ,(power-mode--random-range -10 -6))
              (power-mode--x . ,x)
@@ -294,6 +300,7 @@ Set to nil to disable particle effects."
                              (desktop-dont-save . t)
                              (horizontal-scroll-bars . nil)
                              (internal-border-width . 0)
+			     (inhibit-double-buffering . t)
                              (left-fringe . 0)
                              (line-spacing . 0)
                              (menu-bar-lines . 0)
@@ -315,8 +322,9 @@ Set to nil to disable particle effects."
     ;; Shrink font.
     (set-face-attribute 'default frame
                         :height (/ (face-attribute
-                                    'default :height
-                                    frame) 4))
+				    'default :height
+				    frame) (power-mode--random-range 4 7)))
+
     ;; Switch to dummy buffer.
     (with-selected-frame frame
       (switch-to-buffer power-mode--dummy-buffer)
