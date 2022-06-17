@@ -72,7 +72,7 @@ Set to nil to disable particle effects."
 
 (defcustom power-mode-particle-life-expectancy
   10
-  "the time a particle lives before it has to go"
+  "The time a particle lives before it has to go."
   :type 'integer
   :group 'power-mode)
 
@@ -291,7 +291,7 @@ Set to nil to disable particle effects."
 (defun power-mode--make-particle-frame (parent-frame)
   "Make an invisible particle attached to PARENT-FRAME."
   (let ((frame-inhibit-implied-resize nil)
-	(frame (make-frame `((name . "particle")
+        (frame (make-frame `((name . "particle")
                              (parent-frame . ,parent-frame)
                              (width . 2)
                              (height . 1)
@@ -301,7 +301,7 @@ Set to nil to disable particle effects."
                              (desktop-dont-save . t)
                              (horizontal-scroll-bars . nil)
                              (internal-border-width . 0)
-			     (inhibit-double-buffering . t)
+                             (inhibit-double-buffering . t)
                              (left-fringe . 0)
                              (line-spacing . 0)
                              (menu-bar-lines . 0)
@@ -323,8 +323,9 @@ Set to nil to disable particle effects."
     ;; Shrink font.
     (set-face-attribute 'default frame
                         :height (/ (face-attribute
-				    'default :height
-				    frame) (power-mode--random-range 3 6)))
+                                    'default :height
+                                    frame)
+                                   (power-mode--random-range 3 6)))
 
     ;; Switch to dummy buffer.
     (with-selected-frame frame
