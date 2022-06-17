@@ -22,6 +22,8 @@ extend your load path. For example:
 ## Caveats
 
 - Don't use this on EXWM or you'll regret it.
+- If running Emacs as a daemon, frames might behave weirdly if shaking is
+  enabled and you exit power-mode. It's safe to close them and re-open new ones.
 
 ## Wow! How does it work?
 

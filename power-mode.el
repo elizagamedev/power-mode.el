@@ -172,7 +172,7 @@ Set to nil to disable particle effects."
       (delete-other-windows)
       (switch-to-buffer power-mode--dummy-buffer)
       (set-window-dedicated-p
-       (get-buffer-window (current-buffer) t) t))
+       (get-buffer-window (current-buffer) frame) t))
     ;; Override parent parameters.
     (dolist (pair power-mode--parent-parameters)
       (set-frame-parameter frame
@@ -192,7 +192,7 @@ Set to nil to disable particle effects."
     (delete-frame shake-frame)
     (with-selected-frame parent-frame
       (set-window-dedicated-p
-       (get-buffer-window (current-buffer) t) nil)
+       (get-buffer-window (current-buffer) parent-frame) nil)
       (switch-to-buffer buffer))
     ;; Restore old parameters.
     (dolist (pair power-mode--parent-parameters)
@@ -256,8 +256,7 @@ Set to nil to disable particle effects."
              (power-mode--x . ,x)
              (power-mode--y . ,y)
              (left . ,x)
-             (top . ,y)
-             (visibility . t))))))))
+             (top . ,y))))))))
 
 (defun power-mode--animate-particles ()
   "Periodic function to be called in a timer to animate particles."
@@ -267,7 +266,7 @@ Set to nil to disable particle effects."
         (if (<= life 0)
             (progn
               (push frame power-mode--particle-dead-frames)
-              (set-frame-parameter frame 'visibility nil))
+              (power-mode--hide-particle-frame frame))
           (push frame live-particles)
           (let* ((vx (frame-parameter frame 'power-mode--vx))
                  (vy (frame-parameter frame 'power-mode--vy))
@@ -278,11 +277,12 @@ Set to nil to disable particle effects."
              `((power-mode--life . ,life)
                (power-mode--vy . ,(+ vy 1))
                (power-mode--x . ,x)
-               (power-mode--y . ,y)
-               (left . ,x)
-               (top . ,y)
-               (visibility . ,(and (>= x 0) (< x (frame-native-width))
-                                   (>= y 0) (< y (frame-native-height))))))))))
+               (power-mode--y . ,y)))
+            (if (and (>= x 0) (< x (frame-native-width))
+                     (>= y 0) (< y (frame-native-height)))
+                (modify-frame-parameters frame `((left . ,x)
+                                                 (top . ,y)))
+              (power-mode--hide-particle-frame frame))))))
     (setq power-mode--particle-live-frames live-particles)
     (unless live-particles
       (cancel-timer power-mode--particle-timer)
@@ -319,7 +319,9 @@ Set to nil to disable particle effects."
                              (undecorated . t)
                              (unsplittable . t)
                              (vertical-scroll-bars . nil)
-                             (visibility . nil)))))
+                             (visibility . t)
+                             (left . ,(frame-native-width))
+                             (top . ,(frame-native-height))))))
     ;; Shrink font.
     (set-face-attribute 'default frame
                         :height (/ (face-attribute
@@ -333,6 +335,12 @@ Set to nil to disable particle effects."
       (set-window-dedicated-p
        (get-buffer-window (current-buffer) t) t))
     frame))
+
+(defun power-mode--hide-particle-frame (frame)
+  "Hide a particle FRAME by moving it into the bottom-right corner."
+  (modify-frame-parameters frame `((left . ,(frame-native-width))
+                                   (top . ,(frame-native-height))
+                                   (background-color . ,(frame-parameter nil 'background-color)))))
 
 ;;;; Hooks
 
@@ -377,7 +385,9 @@ Accepts PARENT-FRAME."
     (when-let ((child-frame (cdr (assq parent-frame power-mode--shake-frames))))
       (set-frame-size child-frame
                       (frame-width parent-frame)
-                      (frame-height parent-frame)))))
+                      (frame-height parent-frame))))
+  (dolist (frame power-mode--particle-dead-frames)
+    (power-mode--hide-particle-frame frame)))
 
 (defun power-mode--window-selection-change-function (parent-frame)
   "Power-mode hook for `window-selection-change-functions'.
@@ -407,17 +417,17 @@ Accepts PARENT-FRAME."
                   #'power-mode--window-selection-change-function)
         ;; Create dummy buffer.
         (setq power-mode--dummy-buffer (power-mode--make-dummy-buffer))
-        ;; Make shake frames for all top-level frames.
-        (when power-mode-streak-shake-threshold
-          (dolist (frame (frame-list))
-            (unless (frame-parent frame)
-              (power-mode--make-shake-frame frame))))
         ;; Make particle frames.
         (when power-mode-streak-particle-threshold
           (dotimes (_ power-mode-particle-limit)
             (setq power-mode--particle-dead-frames
                   (cons (power-mode--make-particle-frame (selected-frame))
-                        power-mode--particle-dead-frames)))))
+                        power-mode--particle-dead-frames))))
+        ;; Make shake frames for all top-level frames.
+        (when power-mode-streak-shake-threshold
+          (dolist (frame (frame-list))
+            (unless (frame-parent frame)
+              (power-mode--make-shake-frame frame)))))
     (progn
       (remove-hook 'post-self-insert-hook
                    #'power-mode--post-self-insert-hook)
