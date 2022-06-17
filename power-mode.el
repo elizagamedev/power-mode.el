@@ -70,6 +70,12 @@ Set to nil to disable particle effects."
   :type 'integer
   :group 'power-mode)
 
+(defcustom power-mode-particle-life-expectancy
+  10
+  "The time a particle lives before it has to go."
+  :type 'integer
+  :group 'power-mode)
+
 ;;;; Common
 
 (defvar power-mode--dummy-buffer nil)
@@ -244,7 +250,7 @@ Set to nil to disable particle effects."
            frame
            `((parent-frame . ,parent-frame)
              (background-color . ,color)
-             (power-mode--life . 10)
+             (power-mode--life . ,power-mode-particle-life-expectancy)
              (power-mode--vx . ,(power-mode--random-range -5 5))
              (power-mode--vy . ,(power-mode--random-range -10 -6))
              (power-mode--x . ,x)
@@ -284,7 +290,8 @@ Set to nil to disable particle effects."
 
 (defun power-mode--make-particle-frame (parent-frame)
   "Make an invisible particle attached to PARENT-FRAME."
-  (let ((frame (make-frame `((name . "particle")
+  (let ((frame-inhibit-implied-resize nil)
+        (frame (make-frame `((name . "particle")
                              (parent-frame . ,parent-frame)
                              (width . 2)
                              (height . 1)
@@ -294,6 +301,7 @@ Set to nil to disable particle effects."
                              (desktop-dont-save . t)
                              (horizontal-scroll-bars . nil)
                              (internal-border-width . 0)
+                             (inhibit-double-buffering . t)
                              (left-fringe . 0)
                              (line-spacing . 0)
                              (menu-bar-lines . 0)
@@ -316,7 +324,9 @@ Set to nil to disable particle effects."
     (set-face-attribute 'default frame
                         :height (/ (face-attribute
                                     'default :height
-                                    frame) 4))
+                                    frame)
+                                   (power-mode--random-range 3 6)))
+
     ;; Switch to dummy buffer.
     (with-selected-frame frame
       (switch-to-buffer power-mode--dummy-buffer)
