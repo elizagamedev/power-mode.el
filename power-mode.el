@@ -76,6 +76,14 @@ Set to nil to disable particle effects."
   :type 'integer
   :group 'power-mode)
 
+(defcustom power-mode-particle-visibility-method
+  (if (boundp 'pgtk-initialized)
+      'yeet
+    'toggle-visibility)
+  "Method to use when hiding particles."
+  :type '(choice (const :tag "Toggle frame visibility" toggle-visibility)
+                 (const :tag "Move into the bottom-right corner (best on pgtk)" yeet)))
+
 ;;;; Common
 
 (defvar power-mode--dummy-buffer nil)
@@ -256,7 +264,8 @@ Set to nil to disable particle effects."
              (power-mode--x . ,x)
              (power-mode--y . ,y)
              (left . ,x)
-             (top . ,y))))))))
+             (top . ,y)
+             (visibility . t))))))))
 
 (defun power-mode--animate-particles ()
   "Periodic function to be called in a timer to animate particles."
@@ -281,7 +290,8 @@ Set to nil to disable particle effects."
             (if (and (>= x 0) (< x (frame-native-width))
                      (>= y 0) (< y (frame-native-height)))
                 (modify-frame-parameters frame `((left . ,x)
-                                                 (top . ,y)))
+                                                 (top . ,y)
+                                                 (visibility . t)))
               (power-mode--hide-particle-frame frame))))))
     (setq power-mode--particle-live-frames live-particles)
     (unless live-particles
@@ -319,9 +329,11 @@ Set to nil to disable particle effects."
                              (undecorated . t)
                              (unsplittable . t)
                              (vertical-scroll-bars . nil)
-                             (visibility . t)
-                             (left . ,(frame-native-width))
-                             (top . ,(frame-native-height))))))
+                             (visibility . nil)
+                             (left . ,(if (eq power-mode-particle-visibility-method 'yeet)
+                                          (frame-native-width) 0))
+                             (top . ,(if (eq power-mode-particle-visibility-method 'yeet)
+                                         (frame-native-width) 0))))))
     ;; Shrink font.
     (set-face-attribute 'default frame
                         :height (/ (face-attribute
@@ -337,10 +349,19 @@ Set to nil to disable particle effects."
     frame))
 
 (defun power-mode--hide-particle-frame (frame)
-  "Hide a particle FRAME by moving it into the bottom-right corner."
-  (modify-frame-parameters frame `((left . ,(frame-native-width))
-                                   (top . ,(frame-native-height))
-                                   (background-color . ,(frame-parameter nil 'background-color)))))
+  "Hide a particle FRAME.
+
+Use the method `power-mode-particle-visibility-method'."
+  (let ((parameters (cond
+                     ((eq power-mode-particle-visibility-method 'toggle-visibility)
+                      '((visibility . nil)))
+                     ((eq power-mode-particle-visibility-method 'yeet)
+                      `((left . ,(frame-native-width))
+                        (top . ,(frame-native-height))
+                        (background-color . ,(frame-parameter nil 'background-color))))
+                     (t (error "Unknown `power-mode-particle-visibility-method': %s"
+                               power-mode-particle-visibility-method)))))
+    (modify-frame-parameters frame parameters)))
 
 ;;;; Hooks
 
@@ -386,8 +407,9 @@ Accepts PARENT-FRAME."
       (set-frame-size child-frame
                       (frame-width parent-frame)
                       (frame-height parent-frame))))
-  (dolist (frame power-mode--particle-dead-frames)
-    (power-mode--hide-particle-frame frame)))
+  (when (eq power-mode-particle-visibility-method 'yeet)
+    (dolist (frame power-mode--particle-dead-frames)
+      (power-mode--hide-particle-frame frame))))
 
 (defun power-mode--window-selection-change-function (parent-frame)
   "Power-mode hook for `window-selection-change-functions'.
