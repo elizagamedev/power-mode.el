@@ -1,23 +1,66 @@
 ;;; power-mode.el --- Imbue Emacs with power! -*- lexical-binding:t -*-
 
+;; Copyright (c) 2021 Eliza Velasquez
+
 ;; Author: Eliza Velasquez
 ;; Version: 0.1.0
+;; Package-Requires: ((emacs "26.1"))
 ;; Created: 3 Jun 2021
 ;; Keywords: games
 ;; URL: https://github.com/elizagamedev/power-mode.el
 
+;; Permission is hereby granted, free of charge, to any person
+;; obtaining a copy of this software and associated documentation
+;; files (the "Software"), to deal in the Software without
+;; restriction, including without limitation the rights to use,
+;; copy, modify, merge, publish, distribute, sublicense, and/or sell
+;; copies of the Software, and to permit persons to whom the
+;; Software is furnished to do so, subject to the following
+;; conditions:
+
+;; The above copyright notice and this permission notice shall be
+;; included in all copies or substantial portions of the Software.
+
+;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+;; EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+;; OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+;; NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+;; HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+;; WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+;; FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+;; OTHER DEALINGS IN THE SOFTWARE.
+
 ;;; Commentary:
 
-;; At long last, Power Mode is available for the best text editor.
+;; At long last, Power Mode [1] is available for the best text editor.
 ;;
-;; See README.md for more information.
+;; * What does this do?
+;;
+;; While `power-mode' is enabled, typing quickly and without pause will
+;; eventually rack up a combo-meter with each keypress shaking the Emacs window
+;; and showering each newly inserted character with explosive particles.
+;;
+;; * Caveats
+;;
+;; - Don't use this on EXWM or you'll regret it.
+;;
+;; - If running Emacs as a daemon, frames might behave weirdly if shaking is
+;;   enabled and you exit power-mode.  It's safe to close them and re-open new
+;;   ones.
+;;
+;; - The shaking windows feature may altogether behave terribly and ruin your
+;;   Emacs session.  You can disable this while still retaining particle effects
+;;   by setting `power-mode-streak-shake-threshold' to nil.
+;;
+;; [1] https://github.com/codeinthedark/awesome-power-mode
+
 
 ;;; Code:
 
 (require 'cl-lib)
 (require 'hl-line)
 
-(defgroup power-mode nil
+(defgroup power nil
   "Imbue Emacs with power."
   :group 'emacs)
 
@@ -29,7 +72,7 @@ Set to nil to disable combo counter.
 
 Not implemented yet."
   :type '(choice integer (const nil))
-  :group 'power-mode)
+  :group 'power)
 
 (defcustom power-mode-streak-shake-threshold
   20
@@ -37,7 +80,7 @@ Not implemented yet."
 
 Set to nil to disable shake effects."
   :type '(choice integer (const nil))
-  :group 'power-mode)
+  :group 'power)
 
 (defcustom power-mode-streak-particle-threshold
   20
@@ -45,37 +88,37 @@ Set to nil to disable shake effects."
 
 Set to nil to disable particle effects."
   :type '(choice integer (const nil))
-  :group 'power-mode)
+  :group 'power)
 
 (defcustom power-mode-streak-timeout
   10
   "Timeout to reset the streak counter, in seconds."
   :type 'integer
-  :group 'power-mode)
+  :group 'power)
 
 (defcustom power-mode-shake-strength
   6
   "Strength of shake effect."
   :type 'integer
-  :group 'power-mode)
+  :group 'power)
 
 (defcustom power-mode-particle-range
   '(1 . 3)
   "Range of particles to spawn for each character, inclusive."
   :type '(cons integer integer)
-  :group 'power-mode)
+  :group 'power)
 
 (defcustom power-mode-particle-limit
   20
   "Maximum number of particles that can be on-screen."
   :type 'integer
-  :group 'power-mode)
+  :group 'power)
 
 (defcustom power-mode-particle-life-expectancy
   10
   "The time a particle lives before it has to go."
   :type 'integer
-  :group 'power-mode)
+  :group 'power)
 
 (defcustom power-mode-particle-visibility-method
   (if (boundp 'pgtk-initialized)
@@ -427,7 +470,7 @@ Accepts PARENT-FRAME."
   :init-value nil
   :lighter " power"
   :global t
-  :group 'power-mode
+  :group 'power
   (if power-mode
       (progn
         (add-hook 'post-self-insert-hook

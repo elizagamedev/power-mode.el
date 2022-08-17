@@ -24,6 +24,9 @@ extend your load path. For example:
 - Don't use this on EXWM or you'll regret it.
 - If running Emacs as a daemon, frames might behave weirdly if shaking is
   enabled and you exit power-mode. It's safe to close them and re-open new ones.
+- The shaking windows feature may altogether behave terribly and ruin your Emacs
+  session. You can disable this while still retaining particle effects by
+  setting `power-mode-streak-shake-threshold` to nil.
 
 ## Wow! How does it work?
 
