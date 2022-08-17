@@ -1,8 +1,9 @@
 ;;; power-mode.el --- Imbue Emacs with power! -*- lexical-binding:t -*-
 
 ;; Author: Eliza Velasquez
+;; Version: 0.1.0
 ;; Created: 3 Jun 2021
-;; Keywords: power-mode
+;; Keywords: games
 ;; URL: https://github.com/elizagamedev/power-mode.el
 
 ;;; Commentary:
