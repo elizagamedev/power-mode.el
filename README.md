@@ -1,3 +1,5 @@
+[![MELPA](https://melpa.org/packages/power-mode-badge.svg)](https://melpa.org/#/power-mode) [![MELPA Stable](https://stable.melpa.org/packages/power-mode-badge.svg)](https://stable.melpa.org/#/power-mode)
+
 # power-mode.el
 
 At long last, [Power Mode](https://github.com/codeinthedark/awesome-power-mode)
@@ -9,15 +11,8 @@ is available for the best text editor.
 
 ## Installation
 
-Currently, this package is not on M?ELPA. In the meantime, please clone and
-extend your load path. For example:
-
-```elisp
-(use-package power-mode
-  :load-path "site-lisp/power-mode.el"
-  :init
-  (add-hook 'after-init-hook #'power-mode))
-```
+This package is available on [MELPA](https://melpa.org/#/power-mode) and [MELPA
+Stable](https://stable.melpa.org/#/power-mode).
 
 ## Caveats
 
