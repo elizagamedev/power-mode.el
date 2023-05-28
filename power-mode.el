@@ -82,6 +82,12 @@ Set to nil to disable shake effects."
   :type '(choice integer (const nil))
   :group 'power)
 
+(defcustom power-mode-streak-particle-color
+  nil
+  "Streak particle color. If nil it uses the foreground text color."
+  :type 'color
+  :group 'power)
+
 (defcustom power-mode-streak-particle-threshold
   20
   "Streak required before particle effects activate.
@@ -268,6 +274,8 @@ Set to nil to disable particle effects."
 
 (defun power-mode--foreground-color-before-point ()
   "Get the foreground color of the character before the point."
+  (if power-mode-streak-particle-color
+    power-mode-streak-particle-color
   (let ((mode hl-line-mode)
         (global-mode global-hl-line-mode))
     (hl-line-mode -1)
@@ -278,7 +286,7 @@ Set to nil to disable particle effects."
       (let ((color (foreground-color-at-point)))
         (hl-line-mode mode)
         (global-hl-line-mode global-mode)
-        color))))
+        color))))))
 
 (defun power-mode--spawn-particles-at-point ()
   "Spawn particles at the point."
