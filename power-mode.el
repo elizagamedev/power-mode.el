@@ -84,7 +84,7 @@ Set to nil to disable shake effects."
 
 (defcustom power-mode-streak-custom-particle-color
   nil
-  "Streak particle color. If nil the foreground text color is used."
+  "User-defined streak particle color. If nil the foreground text color is used."
   :type '(choice (const nil) color)
   :group 'power)
 
