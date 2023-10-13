@@ -288,7 +288,7 @@ Set to nil to disable particle effects."
       (let ((color (foreground-color-at-point)))
         (hl-line-mode mode)
         (global-hl-line-mode global-mode)
-        color))))))
+        color)))))
 
 (defun power-mode--spawn-particles-at-point ()
   "Spawn particles at the point."
